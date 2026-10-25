@@ -51,14 +51,40 @@ namespace SoulsFormats
 
         public static uint QueryVersion(IntPtr handle)
         {
-            IntPtr checkVersion = InteropNativeLibrary.GetExport(handle, "Oodle_CheckVersion");
-            IntPtr setPrintf = InteropNativeLibrary.GetExport(handle, "OodleCore_Plugins_SetPrintf");
+            IntPtr checkVersion =
+            InteropNativeLibrary.GetExport(handle, "Oodle_CheckVersion");
 
-            // Oodle prints a warning here, so we disable the logging
-            IntPtr printf = ((delegate* unmanaged<IntPtr, IntPtr>)setPrintf)(IntPtr.Zero);
+    // OodleCore_Plugins_SetPrintf is optional.
+    // Some Oodle builds, including the one supplied with Sekiro,
+    // may not expose this function.
+            IntPtr setPrintf = IntPtr.Zero;
+
+            InteropNativeLibrary.TryGetExport(
+                handle,
+                "OodleCore_Plugins_SetPrintf",
+                out setPrintf);
+
+            IntPtr printf = IntPtr.Zero;
+
+            if (setPrintf != IntPtr.Zero)
+            {
+        // Disable Oodle logging if the function is available.
+                printf = ((delegate* unmanaged<IntPtr, IntPtr>)setPrintf)(
+                     IntPtr.Zero);
+            }
+
             uint libVersion = 0;
-            ((delegate* unmanaged<uint, uint*, int>)checkVersion)(0, &libVersion);
-            ((delegate* unmanaged<IntPtr, IntPtr>)setPrintf)(printf);
+
+            ((delegate* unmanaged<uint, uint*, int>)checkVersion)(
+                0,
+                &libVersion);
+
+            if (setPrintf != IntPtr.Zero)
+            {
+        // Restore the previous logging callback.
+                ((delegate* unmanaged<IntPtr, IntPtr>)setPrintf)(
+                    printf);
+            }
 
             return libVersion;
         }
